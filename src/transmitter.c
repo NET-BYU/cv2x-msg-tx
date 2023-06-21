@@ -264,16 +264,20 @@ int main(int argc, char** argv) {
 
     printf("creating signal buffer...\n");
 
-    cf_t* signal_buffer_tx[1] = {}; //- Create a "signal buffer" of size 1 (for now)
+    cf_t* signal_buffer_tx[2] = {}; //- Create a "signal buffer" of size 2 (for now)
+
+    //- Eventually, this will need to be a nested for loop. The outer loop will be "for each message, encode data", and the inner will be "for each encoding, encode for one frequency and then another."
+    //- (or I could just unroll the inner loop, since it will only ever need to execute twice.)
+    for (int i = 0; i < 2; ++i) {
 
     //-?? Probably "allocate memory for our subframe's data"
-    signal_buffer_tx[0] = srsran_vec_cf_malloc(srsue_vue_sl.sf_len);
-    if (!signal_buffer_tx[0]) {
+        signal_buffer_tx[i] = srsran_vec_cf_malloc(srsue_vue_sl.sf_len);
+        if (!signal_buffer_tx[i]) {
         perror("malloc");
         exit(-1);
     }
 
-    data.sub_channel_start_idx = 0; //Default to "0" for now...
+        data.sub_channel_start_idx = i; //Default to "0" for now...
     data.l_sub_channel = 2; //Default to "2". Still not totally sure what this is. current guess is "l" is "length". So the "length" of the sub channel "array", i.e. the number of subchannels in our channel we'd like to be writing to.
 
     //- tti is probably "transmission time interval". I thought this was 1ms but in Eckermann's code, it is from 0 to 100.
@@ -288,10 +292,10 @@ int main(int argc, char** argv) {
     }
 
     //- Take our encoded information and copy it over into a transmission buffer, which we will pull from when we want to send a message.
-    memcpy(signal_buffer_tx[0], srsue_vue_sl.signal_buffer_tx, sizeof(cf_t) * srsue_vue_sl.sf_len);
-
-    //TODO - Transmit the message, according to the number of times and the delay-between-messages specified
+        memcpy(signal_buffer_tx[i], srsue_vue_sl.signal_buffer_tx, sizeof(cf_t) * srsue_vue_sl.sf_len);
+    }
     
+    //- Transmit the message, according to the number of times and the delay-between-messages specified
     // === Timing ===
     srsran_timestamp_t startup_time, tx_time, now;
 
@@ -319,13 +323,26 @@ int main(int argc, char** argv) {
         }
         // Things look good, proceed with scheduling transmission
         else {
-            int tx_result = srsran_rf_send_timed2(&radio,
+            int tx_result = 0;
+            if (tx_msec_offset == 0) { //- Send the initial message
+                tx_result = srsran_rf_send_timed2(&radio,
                                             signal_buffer_tx[0], //-"data"
                                             srsue_vue_sl.sf_len, //-"nsamples"
                                             tx_time.full_secs, // -"secs"
                                             tx_time.frac_secs, //-"frac_secs"
                                             true,              //-"is_start_of_burst"
                                             true);             //-"is_end_of_burst"
+            
+            }
+            else if (tx_msec_offset == 4) { //- Send the re-transmission
+                tx_result = srsran_rf_send_timed2(&radio,
+                                            signal_buffer_tx[1], //-"data"
+                                            srsue_vue_sl.sf_len, //-"nsamples"
+                                            tx_time.full_secs, // -"secs"
+                                            tx_time.frac_secs, //-"frac_secs"
+                                            true,              //-"is_start_of_burst"
+                                            true);             //-"is_end_of_burst"
+            }
             if (tx_result < 0) {
             ERROR("Error sending data: %d\n", tx_result);
             }
@@ -333,7 +350,7 @@ int main(int argc, char** argv) {
 
 
         //- Increment transmission time offsets, which will be added to tx_time (after being reset to our start_time) to determine our next scheduled transmission time
-        tx_msec_offset += 100;
+        tx_msec_offset += 1;
         if (tx_msec_offset == 1000) {
             tx_sec_offset++;
             tx_msec_offset = 0;
