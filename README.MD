@@ -26,3 +26,15 @@ make build
 ```
 
 This will create an executable called `transmitter` in `build/`
+
+# Typical Usage
+This project is in very early stages, so many of the parameters that the interface provides are ignored, and default hard-coded values are used instead. 
+
+Some typical commands I've used to run this in the past are:
+```
+./build/transmitter -m abcd -a "clock_source=gpsdo,time_source=gpsdo"
+```
+
+```
+./build/transmitter -m abcd -a "clock_source=external,time_source=internal"
+```
