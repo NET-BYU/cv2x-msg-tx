@@ -80,7 +80,7 @@ void args_default(prog_args_t* args) {
     args->input_csv_name = NULL;
     args->ms_between_messages = 10;
     args->rf_freq = 5915000000; // i.e. 5.915 GHz, the default frequency for our purposes.
-    args->rf_gain = 50;
+    args->rf_gain = 75;
 }
 
 // Create a global args object for storing user/default arguments, but 'static' to make it 'private' to other files.
@@ -107,7 +107,7 @@ void parse_args(prog_args_t* args, int argc, char** argv) {
                 // optind is a special var set by getopt() that is the index of the next element of the argv array
                 // strtol converts a string to an integer long. I've specified a NULL object to store leftover bits in, and the number-base 10.
                 // https://www.tutorialspoint.com/c_standard_library/c_function_strtol.htm
-                args->ms_between_messages = (int)strtol(argv[optind], NULL, 10);
+                args->ms_between_messages = (int)strtol(argv[optind], NULL, 30);
                 break;
             //TODO - Add args for rf_freq
             default:
@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
         .tm = SRSRAN_SIDELINK_TM4,  //tm is probably Transmission Mode 4 (where paramaters are self-selected without EnodeB's governance)
         .N_sl_id = 19,               // Not sure what this is either
         .nof_prb = 100,             // number of physical resource blocks. Should be 50 if 10 MHz channel, 100 if 20 MHz channel.
-        .cp = SRSRAN_CP_NORM,       // Not sure what CP is. Copied Twardokus
+        .cp = SRSRAN_CP_NORM,       // "Cyclic Prefix" Copied Twardokus, which was SRSRAN_CP_NORM. srsRAN actually requires that the value be this if using SIDELINK_TM4
     };
 
     //Create a sidelink resource pool and initialize with default parameters.
@@ -232,21 +232,24 @@ int main(int argc, char** argv) {
     srsran_ue_sl_t srsue_vue_sl;
     srsran_ue_sl_init(&srsue_vue_sl, cell_sl, sl_comm_resource_pool, 0);
 
-    //TODO - === Prepare TX data ===
+    // === Prepare TX data ===
     
     //- Initialize Sidelink Control Information
     //- (function definition is in ue_sl.c line 351)
     //- `&srsue_vue_sl.sc_tx` - store result in the transmit portion of this sidelink object
     //- `1` = "priority"
-    //- `REP_INTERVL` (default was 100) = "Resource reservation interval, in ms" TODO - LOOK UP WHAT THIS IS
+    //- `REP_INTERVL` (default was 100) = "Resource reservation interval, in ms ([20, 50, 100, 200, 300, ... 1000])
     //- `0` = "time gap"
     //- `false` = "retransmission" TODO - FIXME - It's possible we need to set this (and the accompanying transmission format) if this is about re-sending the same message with a 3ms delay
     //- `0` = "transmission format" - 0 sets to: "rate-matching and TBS scaling", 1 sets to: "puncturing and no TBS scaling"
     //- `4` = "mcs index" - Modulation and Coding Scheme index
-    srsran_set_sci(&srsue_vue_sl.sci_tx, 1, 100, 3, true, 0, 4);
+    srsran_set_sci(&srsue_vue_sl.sci_tx, 1, 100, 3, true, 0, 11);
+
+    // srsue_vue_sl.sci_tx.format = SRSRAN_SCI_FORMAT0; // Format 1 should be the one we're using, but I tried 0 just in case.
+    printf("SCI format is set to: %d\n", srsue_vue_sl.sci_tx.format);
     
-    uint8_t transport_block[SRSRAN_SL_SCH_MAX_TB_LEN] = {};
-    //uint8_t transport_block[320] = {};
+    // uint8_t transport_block[SRSRAN_SL_SCH_MAX_TB_LEN] = {};
+    uint8_t transport_block[320] = {};
 
     // TODO - my_v2x_message needs to be assigned the value provided from earlier. (currently using this hard-coded value)
     uint8_t my_v2x_message[320] = {0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,1,0,1,0,1,0,1,0,1,0,1,0,0,1,1,1,1,1,0,0,0,0,1,0,1,1,0,0,1,1,1,1,1,0,0,0,1,1,1,0,0,1,1,0,1,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,0,1,0,0,1,0,1,0,0,1,0,1,0,0,0,1,0,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1,0,0,0,0,1,0,1,0,1,0,0,0,1,1,0,1,1,1,1,0,1,1,0,0,1,1,1,1,1,1,0,1,1,1,1,0,1,1,1,0,0,1,0,0,0,1,0,0,0,1,1,0,0,1,0,0,0,1,1,1,1,0,1,1,1,1,1,0,0,1,1,1,0,1,0,0,1,1,0,0,1,1,0,1,1,0,0,1,0,0,0,1,1,1,1,1,0,1,1,0,1,1,1,0,1,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,1,0,1,0,0,1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,0,1,1,0,1,1,1,1,0,0,1,0,1,0,1,0,0,1,1,1,1,1,0,1,1,0,1,1,1,0,0,0,1,1,1,0,0,0};
@@ -268,33 +271,36 @@ int main(int argc, char** argv) {
 
     //- Eventually, this will need to be a nested for loop. The outer loop will be "for each message, encode data", and the inner will be "for each encoding, encode for one frequency and then another."
     //- (or I could just unroll the inner loop, since it will only ever need to execute twice.)
+    //- This loop is for generating the original message, and a repeat of that message
     for (int i = 0; i < 2; ++i) {
 
-    //-?? Probably "allocate memory for our subframe's data"
+        //-?? Probably "allocate memory for our subframe's data"
         signal_buffer_tx[i] = srsran_vec_cf_malloc(srsue_vue_sl.sf_len);
         if (!signal_buffer_tx[i]) {
-        perror("malloc");
-        exit(-1);
-    }
+            perror("malloc");
+            exit(-1);
+        }
 
-        data.sub_channel_start_idx = i; //Default to "0" for now...
-    data.l_sub_channel = 2; //Default to "2". Still not totally sure what this is. current guess is "l" is "length". So the "length" of the sub channel "array", i.e. the number of subchannels in our channel we'd like to be writing to.
+        data.sub_channel_start_idx = i*4; //Default to "0" for now...
+        data.l_sub_channel = 1; //Default was "2", "1" seems most appropriate after testing. This modifies a calculated value placed in the SCI describing how many sub_channels this message will occupy.  "l" is probably "length". So the "length" of the sub channel "array", i.e. the number of subchannels in our channel we'd like to be writing to.
 
-    //- tti is probably "transmission time interval". I thought this was 1ms but in Eckermann's code, it is from 0 to 100.
-    //- It's possible that this time interval is a specific time duration, and is based off of some base time.
-    sf.tti = 0;
+        //- tti is probably "transmission time interval". I thought this was 1ms but in Eckermann's code, it is from 0 to 100.
+        //- It's possible that this time interval is a specific time duration, and is based off of some base time.
+        sf.tti = 1;
 
-    //- Attempt to encode a sidelink mesage (probably storing it in srsue_vue_sl) using our subframe (sf) and data.
-    //-   The source code seems to deal with both the shared and control channel stuff.
-    if (srsran_ue_sl_encode(&srsue_vue_sl, &sf, &data)) { 
-        ERROR("Error encoding sidelink\n");
-        exit(-1);
-    }
+        //- Attempt to encode a sidelink mesage (probably storing it in srsue_vue_sl) using our subframe (sf) and data.
+        //-   The source code seems to deal with both the shared and control channel stuff.
+        if (srsran_ue_sl_encode(&srsue_vue_sl, &sf, &data)) { 
+            ERROR("Error encoding sidelink\n");
+            exit(-1);
+        }
 
-    //- Take our encoded information and copy it over into a transmission buffer, which we will pull from when we want to send a message.
+        //- Take our encoded information and copy it over into a transmission buffer, which we will pull from when we want to send a message.
         memcpy(signal_buffer_tx[i], srsue_vue_sl.signal_buffer_tx, sizeof(cf_t) * srsue_vue_sl.sf_len);
     }
+
     
+
     //- Transmit the message, according to the number of times and the delay-between-messages specified
     // === Timing ===
     srsran_timestamp_t startup_time, tx_time, now;
