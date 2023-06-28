@@ -386,7 +386,7 @@ void srsran_set_sci_riv(srsran_ue_sl_t* q, uint32_t sub_channel_start_idx, uint3
       q->sl_comm_resource_pool.num_sub_channel, sub_channel_start_idx, l_sub_channel);
 }
 
-/* Generate PSCCH signal
+/* Generate PSCCH signal /- "Control" Channel
  */
 static int pscch_encode(srsran_ue_sl_t* q, uint32_t sub_channel_start_idx)
 {
@@ -429,7 +429,7 @@ static int pscch_encode(srsran_ue_sl_t* q, uint32_t sub_channel_start_idx)
   return ret;
 }
 
-/* Generate PSSCH signal
+/* Generate PSSCH signal /- "Shared" channel
  */
 static int pssch_encode(srsran_ue_sl_t* q,
                         srsran_sl_sf_cfg_t* sf,
@@ -493,6 +493,7 @@ int srsran_ue_sl_encode(srsran_ue_sl_t* q,
                         srsran_pssch_data_t* data)
 {
 
+  //- Calculates an RIV value from the parameters (and the q->sl_comm_resource_pool.num_sub_channel) and stores it in q
   srsran_set_sci_riv(q, data->sub_channel_start_idx, data->l_sub_channel);
 
   if (pscch_encode(q, data->sub_channel_start_idx)) {
