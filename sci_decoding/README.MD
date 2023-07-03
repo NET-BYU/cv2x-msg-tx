@@ -1,4 +1,4 @@
-At one point in the project we were unsure if the SCI block was being transmitted correctly. This lead to us attempting to decode the SCI of a known good message (as transmitted by our OBU) and our message, and then comparing the two. 
+At one point in the project we were unsure if the SCI block was being transmitted correctly. This lead to us attempting to decode the SCI of a known good message (as transmitted by our OBU) and our message, and then comparing the two. According to [Hajisami](https://ieeexplore.ieee.org/document/9866543) (Section III.A.1), the SCI is always encoded in QPSK.
 
 Here were the steps we took:
 1. Repeatedly transmit a BSM message on the air from our OBU.
