@@ -11,7 +11,7 @@ Here were the steps we took:
         - Data types: IQ records.
         - Data length: Analysis Only.
         - Data records: Current acquisition. 
-4. Use the python script, [mat_converter.py](mat_converter.py) to convert that `.mat` into a [.cf64](./2023-06-29_OBU.cf64).
+4. Use the python script, [mat_converter.py](./mat_converter.py) to convert that `.mat` into a [.cf64](./2023-06-29_OBU.cf64).
     - You can optionally verify the result looks correct by installing [inspectrum](https://github.com/miek/inspectrum) and opening the file with that.
 5. Load the `.cf64` into GnuRadio (See [PC-5_mode-4_SCI_decoding.grc](./PC-5_mode-4_SCI_decoding.grc))
 6. Trim the frequency range using filters to only capture the SCI.
@@ -21,3 +21,5 @@ Here were the steps we took:
 One thing we discovered about the particular capture we did was that, while the Spectrum analyzer software reported we had captured at a sampling rate of 12.5 MHz, the metadata of the capture indicated it was actually 7 MHz. We found that the capture looked most accurate at a 7 MHz sampling rate (i.e. transmission was ~2 MHz wide, ~1 ms long)
 
 I found a [2014 thesis paper](https://run.unl.pt/bitstream/10362/12251/1/Cunha_2014.pdf) that gives instructions about how to create a custom GNU Radio module for decoding SC-FDMA, but it was complex and difficult for me to understand.
+
+I also ran the `./pssch_ue` script in `-v` verbose mode (receiving from a B200mini transmitting my message), and the verbose option didn't tell me much more. I wrote out the verbose log into [b200-to-b200.log](./b200-to-b200.log)
